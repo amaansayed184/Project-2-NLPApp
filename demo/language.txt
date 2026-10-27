@@ -1,0 +1,1 @@
+This is an English paragraph describing our college mini project. We built a desktop application to analyze text on a local computer without a cloud service.
