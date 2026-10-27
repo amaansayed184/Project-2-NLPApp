@@ -110,7 +110,7 @@ The sentiment analyzer, entity model and spelling dictionary load lazily and are
 
 VADER applies a supplied sentiment lexicon and rule-based analyzer. It returns a compound score and positive, neutral and negative proportions. The interface maps compound >= 0.05 to positive, <= -0.05 to negative, and intermediate scores to neutral. The compound score ranges from -1 to +1; category proportions are not confidence estimates. These conventions follow VADER's documented scoring [1].
 
-Example: I love this excellent application! Expected behavior is a positive label. Sarcasm, specialized terminology and non-English text can be misread.
+Sentence-level evidence now supplements the whole-text score. A Mixed label is used when both positive (>= 0.3) and negative (<= -0.3) sentences occur, each contributes at least 25% of polarized sentences, and the overall compound magnitude is below 0.5. This is an explicit heuristic, not a trained classifier. Sarcasm and non-English text can still be misread.
 
 ## Named entity recognition
 
@@ -122,7 +122,7 @@ Example: Barack Obama visited London on Monday. This provides a person, a locati
 
 langdetect uses its supplied language profiles to estimate language codes and probabilities. DetectorFactory.seed is fixed to zero for repeatable results on the same installation and input [3]. The application rejects passages containing fewer than ten alphabetic characters.
 
-A longer English paragraph should typically return en as the leading code. Short, transliterated or mixed-language inputs can be unreliable; a high probability does not guarantee correctness.
+A longer English paragraph should typically return en. Short or ambiguous passages now receive a warning. Short, transliterated or mixed-language inputs can be unreliable; high estimated probability does not guarantee correctness. Entity filters also accept readable categories such as people, location and company.
 
 ## Training and datasets
 
@@ -134,26 +134,28 @@ The project uses existing lexicons, language profiles and a pretrained entity mo
 
 ## Extractive summarization
 
-The summarizer splits after sentence-ending punctuation or line breaks, tokenizes English alphabetic words, lowercases them, removes a small project-defined stopword list and counts retained word frequencies across the passage.
+The summarizer uses spaCy's trained parser for sentence boundaries and its lemmas for English words. It removes stopwords and duplicate sentence signatures, then builds normalized sparse TF-IDF vectors. This replaces the earlier frequency-only baseline.
 
 ```text
-score(sentence) = sum(frequency of each retained word)
-                  / sqrt(max(retained_word_count, 1))
+TF = 1 + log(term count)
+IDF = 1 + log((1 + sentence count) / (1 + document frequency))
+relevance = cosine(sentence vector, document centroid)
+selection = relevance - 0.45 * maximum selected-sentence overlap
 ```
 
-It selects the requested number of highest-ranked sentences, from one to ten, then restores their source order. If the passage already contains no more than the requested count, it returns all sentences. This baseline favors recurring topics but can repeat information, mishandle abbreviations and lose context. It is not TextRank or a generative model.
+Relevance also includes a small lead-sentence bonus and a penalty for very short content. Greedy selection penalizes cosine overlap with already-selected sentences. It selects up to the requested one to ten unique sentences and restores source order. The sparse method avoids a quadratic all-pairs matrix. It can still lose context; it is not TextRank or a generative model.
 
 ## Spelling and basic grammar
 
-SymSpellPy loads its bundled English frequency dictionary. The application requests its best suggestion with a maximum edit distance of one. Capitalized tokens, contractions and tokens shorter than three letters are preserved to reduce unwanted edits. Words without suggestions remain unchanged [4].
+SymSpellPy loads its bundled English dictionary. Unknown longer words allow edit distance two; shorter words allow one. Suggestions need adequate dictionary frequency and a clear frequency advantage over alternatives. Common typos receive explicit fixes, including capitalized Teh. Names and acronyms are otherwise preserved [4].
 
-Explicit rules then change standalone lowercase i to I, I is to I am, he/she/it are to is, and we/they/you is to are. Another rule removes whitespace before common punctuation.
+Protected spans preserve URLs, emails, code, Windows paths and numbered tokens. Prose-only rules repair selected missing apostrophes, pronoun agreement, repeated function words and spaces before punctuation. Corrections remain suggestions, not comprehensive grammar analysis.
 
 Verified example: i is happy with teh speling. becomes I am happy with the spelling. This is basic correction, not a comprehensive grammar checker. Uncommon valid words may be changed, so users must review suggestions.
 
 ## Extractive headline generation
 
-The tool uses the same sentence ranking with a requested count of one. It retains at most twelve whitespace-separated words, strips trailing punctuation, and adds an ellipsis when truncated. It does not paraphrase or invent facts. The resulting headline can be incomplete or awkward and may need manual editing.
+The tool uses the same sentence ranking, prefers a complete short clause when possible, and otherwise retains at most twelve words while avoiding trailing function words such as the or of. It strips punctuation and marks truncation with an ellipsis. It does not paraphrase; manual editing may still be needed.
 
 ## Algorithmic contribution
 
@@ -241,7 +243,7 @@ Then disconnect Wi-Fi and manually try every feature. The helper imports Tkinter
 
 ## Automated test evidence
 
-All five existing unittest methods passed locally during implementation verification. They cover:
+All 17 unittest methods passed locally after the quality improvements. The original five cover:
 
 - All six tools with socket connections patched to fail, including known positive/negative examples, entity recognition/filtering, English detection, spelling correction, extractive summary membership and headline length.
 - Blank and oversized input, and unsuitable language-detection input.
@@ -249,6 +251,8 @@ All five existing unittest methods passed locally during implementation verifica
 - Legacy account migration with preserved login, plus damaged-database errors without overwriting the damaged file.
 
 A separate Windows desktop smoke check passed for the guest workspace, background analysis, result display and navigation during a running task. The setup verifier additionally imports Tkinter and runs six sample jobs with socket connections blocked.
+
+Twelve new regressions cover duplicate-free summaries, abbreviations/decimals, extractive source order, input counts, complete-clause headlines, common typos, protected technical text/code, agreement/contractions, mixed sentiment, language warnings and readable entity filters. They are targeted examples, not independent accuracy measurements.
 
 The setup helper was also tested in a separate clean project copy on Windows with Python 3.12.0. It created a new environment, installed the libraries/model and passed all six offline verification jobs and all five tests.
 

@@ -26,7 +26,7 @@
 | Language | `demo/language.txt` | `en` indicates English; longer passages are more reliable. |
 | Headline | `demo/article.txt` | A key sentence is shortened to at most 12 words. Copy or save it. |
 
-**Verification, 30 seconds.** Explain that five test methods passed locally, including all six tools with socket connections blocked. Show verification on your destination laptop. Do not describe functional tests as an accuracy benchmark.
+**Verification, 30 seconds.** Explain that 17 test methods passed locally, including all six tools offline and 12 targeted quality regressions. Show verification on your destination laptop. Do not describe functional tests as an accuracy benchmark.
 
 **Closing, 30 seconds.** "The project demonstrates local NLP integration, desktop programming, validation, hashed accounts, tests and GitHub distribution. Future work includes evaluation, multilingual support and a packaged installer."
 
@@ -38,13 +38,13 @@
 
 **Did you train a model?** No. We use pretrained/library resources. We should not claim new training or an unmeasured accuracy score.
 
-**How does the summary work?** Count non-stopword frequencies, score each sentence by summed frequencies divided by the square root of retained word count, select top sentences and restore source order.
+**How does the summary work?** Use spaCy sentence boundaries and lemmas, build normalized TF-IDF vectors, score similarity to the document centroid, remove duplicates and penalize overlap with already-selected sentences. Restore source order afterward.
 
 **Is it TextRank?** No. It is a custom word-frequency baseline, not graph ranking.
 
 **What is an entity?** A text span predicted to represent a person, place, organization, date or another category. A prediction is not factual verification.
 
-**What does sentiment mean here?** VADER produces a compound score from -1 to +1. Our thresholds are >= 0.05 positive, <= -0.05 negative, otherwise neutral. Category proportions are not confidence estimates.
+**What does sentiment mean here?** VADER produces a compound score from -1 to +1. Thresholds are >= 0.05 positive, <= -0.05 negative, otherwise neutral. A separate sentence-level rule can identify mixed opinions; category proportions are not confidence estimates.
 
 **Why not a large local LLM?** This version favors smaller task-specific components. A larger model would need separate quality, storage, RAM and latency evaluation.
 

@@ -6,18 +6,20 @@ NLPApp lets you analyze text through a Tkinter desktop interface. It replaces th
 
 [Project report (PDF)](output/pdf/NLPApp-Mini-Project-Report.pdf) · [Editable report](docs/project-report.md) · [College demo and viva guide](docs/DEMO_GUIDE.md) · [Setup troubleshooting](#troubleshooting)
 
+See [quality improvements and before/after examples](docs/QUALITY_NOTES.md) for the latest local NLP update. Existing installations can pull the changes without downloading a new model.
+
 ## What our mini project does
 
 The goal is to bring common natural language processing tasks into one simple, private desktop workspace. Users enter text, select a task, and inspect, copy, or save the output. Accounts are optional: **Continue as guest** gives access to all six tools.
 
 | Feature | How it works | Practical limit |
 | --- | --- | --- |
-| Sentiment analysis | VADER lexicon and rules; positive, neutral, negative proportions plus a compound score | Intended for English; sarcasm and domain language can be misread |
+| Sentiment analysis | VADER with sentence-level evidence and a mixed-opinion check | Intended for English; scores are not confidence estimates |
 | Named entity recognition | Pretrained local spaCy `en_core_web_sm` model | English entities; predictions can be incorrect |
-| Summarization | Word-frequency ranking of sentences; select 1-10 sentences and restore source order | Extracts original sentences; does not rewrite them |
-| Spelling & basic grammar | SymSpell dictionary lookup and a small set of explicit grammar rules | Preserves capitalized words and contractions; review corrections |
+| Summarization | Lemmatized TF-IDF centroid ranking with duplicate removal and a redundancy penalty | Extracts up to 1-10 unique source sentences; does not rewrite them |
+| Spelling & basic grammar | Conservative SymSpell suggestions, common-typo fixes, agreement/contraction rules | Protects URLs, emails, code, paths and numbered tokens; review corrections |
 | Language detection | langdetect language profiles with a fixed random seed | At least 10 letters; short or mixed-language text is unreliable |
-| Headline generator | Select a ranked sentence, then keep up to 12 words | Extractive headline that may need editing |
+| Headline generator | Rank sentences, prefer a short complete clause, then cap at 12 words | Avoids trailing function words; still extractive and may need editing |
 
 Other features include multiline input, word/character counts, UTF-8 text-file loading, copy/save results, input validation and background processing. The text limit is 50,000 characters; imported files must be no larger than 200,000 bytes.
 
@@ -126,7 +128,9 @@ Main-thread result display --> Copy / Save .txt
 
 The worker executes one analysis job at a time; Tkinter polls for completion on the main thread. Models and dictionaries are loaded lazily and cached in the engine. There are no cloud inference calls or runtime model downloads. `api_handling.py` preserves the old `API` import name as an alias for `LocalNLP`; it no longer contacts an API.
 
-For the summarizer, tokenize sentences, lowercase English words, remove a small stopword list, count word frequencies, score each sentence by `sum(word frequencies) / sqrt(number of retained words)`, select the top requested sentences, then restore their original order. The headline uses the same ranking and truncates its selected sentence to 12 words.
+The summarizer uses spaCy sentence boundaries and lemmas, removes stopwords and duplicate sentences, and builds normalized sparse TF-IDF vectors. It scores relevance against the document centroid and greedily selects sentences with a cosine-similarity redundancy penalty, then restores source order. It does not construct an all-pairs similarity matrix. The headline uses the same ranking, prefers a complete short clause, and caps output at 12 words while avoiding trailing function words.
+
+Sentiment now includes sentence-level compound scores and can mark opposing opinions as **Mixed**. Language detection warns about short or ambiguous passages. Entity filters accept readable categories such as `people`, `location` and `company` as well as spaCy labels. No new model training or extra dependency download is needed for these improvements.
 
 The project integrates pretrained/library components; **we have not trained a new NLP model**. See the [report](output/pdf/NLPApp-Mini-Project-Report.pdf) for module design, methodology, test evidence, limitations, and future work.
 
@@ -145,11 +149,11 @@ The project integrates pretrained/library components; **we have not trained a ne
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Five automated test methods cover all six tools with socket connections blocked, blank/oversized inputs, positive/negative sentiment, entity recognition/filtering, English detection, spelling correction, summary extraction, headline length, registration, duplicate accounts, salted hashes, legacy migration and corrupt database handling. These passed locally. A Windows desktop smoke test also checked the guest workspace, background analysis, result display, and navigation during a running job.
+Seventeen automated test methods cover all six tools offline, input limits, accounts, and targeted NLP regressions. New checks cover duplicate removal, abbreviations/decimals, source-order extraction, complete-clause headlines, mixed opinions, readable entity filters, short-language warnings, common typos, grammar rules and preservation of URLs/emails/code/paths/version numbers. All 17 passed locally. A Windows desktop smoke test also checked the guest workspace, background analysis, result display, and navigation during a running job.
 
 These are functional checks, **not** dataset accuracy benchmarks or proof that every sentence is handled correctly. GitHub Actions is configured to install the libraries/model and run the automated suite on pushes and pull requests. Check the repository's **Actions** tab for the status of an individual run.
 
-The setup helper was also tested in a separate clean project copy using **Python 3.12.0 on Windows**. It created a new virtual environment, installed dependencies/model, and passed all six offline verification jobs and all five tests. This supports the new-PC procedure; still run the checks on your actual college laptop.
+The setup helper was also tested in a separate clean project copy using **Python 3.12.0 on Windows**. It created a new virtual environment, installed dependencies/model, and passed all six offline verification jobs and the original five tests. The current suite contains 17 tests. Still run the checks on your actual college laptop.
 
 ## Project structure
 
@@ -168,6 +172,7 @@ Project-2-NLPApp/
   scripts/build_report.py        Rebuild PDF (optional authoring dependencies)
   demo/                          Text samples for the college demo
   tests/test_offline.py          Functional and account tests
+  tests/test_quality.py          Targeted NLP quality regressions
   docs/project-report.md         Editable report source
   docs/DEMO_GUIDE.md             Presentation, checklist and viva questions
   output/pdf/                    Ready-to-read project report

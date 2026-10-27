@@ -9,7 +9,7 @@ from mydb import Database
 from nlp_engine import LocalNLP
 
 TOOLS = {
-    "Sentiment analysis": ("sentiment_analysis", "English sentiment scores from VADER. Scores are proportions, not confidence estimates."),
+    "Sentiment analysis": ("sentiment_analysis", "English sentiment with sentence-level checks for mixed opinions. Scores are not confidence estimates."),
     "Named entities": ("do_ner", "Find people, organizations, places, dates and more with the local English spaCy model."),
     "Summarization": ("do_summarize", "Extract the most relevant sentences from an English passage, in their original order."),
     "Spelling & basic grammar": ("do_grammer_spelling", "English spelling suggestions and a few grammar rules. Review changes before using them."),
@@ -208,13 +208,22 @@ class NLPApp:
         if tool == "Sentiment analysis":
             lines = [f"Overall sentiment: {value['label']}", f"Compound score: {value['compound']:.3f} (−1 to +1)", ""]
             lines.extend(f"{item['label']}: {item['score']:.1%}" for item in value["scored_labels"])
+            if len(value.get("sentences", [])) > 1:
+                lines.extend(["", "Sentence-level sentiment:"])
+                for item in value["sentences"][:20]:
+                    lines.append(f"{item['compound']:+.3f}  {item['text']}")
+                if len(value["sentences"]) > 20:
+                    lines.append("Showing the first 20 sentences.")
             return "\n".join(lines)
         if tool == "Named entities":
             if not value:
                 return "No matching entities found. Try removing the filter or using a longer passage."
             import spacy
             return "\n".join(f"{item['text']} — {spacy.explain(item['label']) or item['label']}" for item in value)
-        return "\n".join(f"Language: {item['language']} · estimated probability {item['probability']:.1%}" for item in value)
+        text = "\n".join(f"Language: {item['language']} · estimated probability {item['probability']:.1%}" for item in value)
+        if value and value[0].get("warning"):
+            text += "\n\n" + value[0]["warning"]
+        return text
 
     def poll_result(self, tool, screen_id):
         if not self.future.done():

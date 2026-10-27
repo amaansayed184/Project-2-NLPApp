@@ -1,0 +1,2 @@
+Teh enviroment is definately improving. he dont like teh speling. they is ready.
+Email teh@example.com or visit https://example.com/i. Keep `pip instal spacy` unchanged with Python3.12 and OpenAI.
