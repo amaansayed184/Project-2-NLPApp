@@ -1,0 +1,4 @@
+vaderSentiment==3.3.2
+langdetect==1.0.9
+symspellpy==6.9.0
+spacy>=3.8.0,<3.9.0
